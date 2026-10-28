@@ -26,9 +26,16 @@ app.add_middleware(
 # ── Serve index.html at "/" ────────────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    html_path = os.path.join(os.path.dirname(__file__), "index.html")
-    with open(html_path, "r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read())
+    candidates = [
+        os.path.join(os.path.dirname(__file__), "index.html"),
+        os.path.join(os.getcwd(), "index.html"),
+        "index.html",
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                return HTMLResponse(content=f.read())
+    return HTMLResponse("<h1>index.html not found</h1>", status_code=500)
 
 
 # ── Send endpoint ──────────────────────────────────────────────────────────────
