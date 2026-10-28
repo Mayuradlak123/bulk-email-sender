@@ -12,7 +12,7 @@ A lightweight, self-hosted bulk email sender featuring a modern single-page dash
 
 ## 📸 Overview & Workflow
 
-```
+``` 
 ┌─────────────────┐       ┌──────────────────────┐       ┌──────────────────────┐
 │  Recipients     │  ──>  │  Pre-Send Modal      │  ──>  │  Async SMTP Dispatch │
 │  (Name, email)  │       │  (Cross-check info)  │       │  (TLS / SSL)         │
