@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bulk Email Sender</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- Quill Rich Text Editor -->
+  <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet" />
+  <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            brand: {
+              50:  '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          },
+          animation: {
+            'fade-in': 'fadeIn 0.4s ease-out',
+            'slide-up': 'slideUp 0.4s ease-out',
+            'spin-slow': 'spin 1.5s linear infinite',
+          },
+          keyframes: {
+            fadeIn:  { from: { opacity: 0 }, to: { opacity: 1 } },
+            slideUp: { from: { opacity: 0, transform: 'translateY(16px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    textarea { resize: vertical; }
+    .file-drop.drag-over { background: #eef2ff; border-color: #6366f1; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-thumb { background: #c7d2fe; border-radius: 9999px; }
+    .tag { animation: fadeIn 0.2s ease-out; }
+
+    /* ── Quill dark theme ── */
+    .ql-toolbar.ql-snow {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.10) !important;
+      border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+      border-radius: 12px 12px 0 0;
+      padding: 8px 12px;
+    }
+    .ql-container.ql-snow {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.10) !important;
+      border-top: none !important;
+      border-radius: 0 0 12px 12px;
+      min-height: 220px;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+    }
+    .ql-editor { color: #e2e8f0; min-height: 200px; padding: 14px 16px; line-height: 1.7; }
+    .ql-editor.ql-blank::before { color: #475569; font-style: normal; }
+    .ql-snow .ql-stroke { stroke: #94a3b8; }
+    .ql-snow .ql-fill  { fill:   #94a3b8; }
+    .ql-snow .ql-picker { color: #94a3b8; }
+    .ql-snow .ql-picker-options { background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; }
+    .ql-snow .ql-picker-item  { color: #cbd5e1; }
+    .ql-snow .ql-picker-item:hover { color: #818cf8; }
+    .ql-snow button:hover .ql-stroke,
+    .ql-snow .ql-active .ql-stroke { stroke: #818cf8; }
+    .ql-snow button:hover .ql-fill,
+    .ql-snow .ql-active .ql-fill  { fill:  #818cf8; }
+    .ql-snow .ql-picker-label:hover { color: #818cf8; }
+    .ql-snow .ql-picker-label.ql-active { color: #818cf8; }
+    .ql-snow a { color: #818cf8; }
+    /* Quill tooltip (link prompt) */
+    .ql-snow .ql-tooltip { background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #e2e8f0; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+    .ql-snow .ql-tooltip input[type=text] { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: #e2e8f0; padding: 4px 8px; }
+    .ql-snow .ql-tooltip a.ql-action::after { color: #818cf8; }
+    .ql-snow .ql-tooltip a.ql-remove::before { color: #f87171; }
+    /* Quill focus ring */
+    .ql-container.ql-snow:focus-within { outline: 2px solid #6366f1; outline-offset: 0; border-radius: 0 0 12px 12px; }
+    .ql-toolbar.ql-snow:has(+ .ql-container.ql-snow:focus-within) { outline: 2px solid #6366f1; outline-offset: 0; border-radius: 12px 12px 0 0; }
+
+    /* ── Quill mobile tweaks ── */
+    @media (max-width: 640px) {
+      .ql-toolbar.ql-snow { padding: 5px 8px; gap: 0; }
+      .ql-toolbar.ql-snow .ql-formats { margin-right: 6px; }
+      .ql-container.ql-snow { min-height: 160px; font-size: 15px; }
+      .ql-editor { min-height: 140px; padding: 10px 12px; }
+      .ql-snow .ql-picker.ql-header .ql-picker-label { padding-right: 14px; }
+      /* Prevent tooltip overflowing viewport on mobile */
+      .ql-snow .ql-tooltip { left: 0 !important; right: 0; margin: 0 8px; width: auto !important; }
+      .ql-snow .ql-tooltip input[type=text] { width: 100%; box-sizing: border-box; }
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-slate-100 flex items-start justify-center py-6 px-3 sm:py-12 sm:px-4">
+
+  <!-- ── Background blobs ── -->
+  <div class="fixed inset-0 overflow-hidden pointer-events-none">
+    <div class="absolute -top-40 -left-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl"></div>
+    <div class="absolute top-1/2 -right-40 w-96 h-96 bg-violet-600/20 rounded-full blur-3xl"></div>
+    <div class="absolute bottom-0 left-1/3 w-72 h-72 bg-blue-600/10 rounded-full blur-3xl"></div>
+  </div>
+
+  <!-- ── Card ── -->
+  <div class="relative w-full max-w-3xl animate-slide-up">
+
+    <!-- Header -->
+    <div class="mb-6 sm:mb-8 text-center">
+      <div class="inline-flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-brand-600 shadow-lg shadow-indigo-500/40 mb-3 sm:mb-4">
+        <!-- Mail icon -->
+        <svg class="w-5 h-5 sm:w-7 sm:h-7 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25H4.5a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5H4.5a2.25 2.25 0 0 0-2.25 2.25m19.5 0-9.75 7.5-9.75-7.5"/>
+        </svg>
+      </div>
+      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">Bulk Email Sender</h1>
+      <p class="mt-1 text-slate-400 text-xs sm:text-sm">Send personalised emails to many recipients at once</p>
+    </div>
+
+    <!-- Form card -->
+    <form id="emailForm" enctype="multipart/form-data"
+          class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl sm:rounded-3xl shadow-2xl p-4 sm:p-8 space-y-5 sm:space-y-6">
+
+      <!-- ── Recipients ── -->
+      <div>
+        <div class="flex items-center justify-between mb-1.5">
+          <label class="text-sm font-medium text-slate-300">
+            Recipients
+            <span class="block sm:inline ml-0 sm:ml-1 text-xs font-normal text-slate-500">(one per line — "Name, email" or just "email")</span>
+          </label>
+          <button type="button" id="ccToggle"
+            class="flex items-center gap-1 text-xs text-slate-500 hover:text-brand-400 transition-colors px-2 py-1 rounded-lg hover:bg-white/5 flex-shrink-0">
+            <svg id="ccChevron" class="w-3.5 h-3.5 transition-transform duration-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m19 9-7 7-7-7"/>
+            </svg>
+            CC / BCC
+          </button>
+        </div>
+        <textarea id="recipients" name="recipients" rows="4" required
+          placeholder="John Doe, john@example.com&#10;Jane Smith, jane@example.com&#10;bob@example.com"
+          class="w-full bg-white/5 border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition resize-y"></textarea>
+        <p id="recipientCount" class="mt-1 text-xs text-slate-500">0 recipients</p>
+
+        <!-- CC / BCC collapsible panel -->
+        <div id="ccPanel" class="hidden mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">
+              CC <span class="font-normal text-slate-600">— comma-separated, optional</span>
+            </label>
+            <input id="cc" name="cc" type="text"
+              placeholder="alice@example.com, bob@example.com"
+              class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">
+              BCC <span class="font-normal text-slate-600">— comma-separated, optional</span>
+            </label>
+            <input id="bcc" name="bcc" type="text"
+              placeholder="hidden@example.com"
+              class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition" />
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Subject ── -->
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">
+          Subject
+          <span class="block sm:inline ml-0 sm:ml-1 text-xs font-normal text-slate-500">(use <code class="bg-white/10 px-1 rounded">{{name}}</code> or <code class="bg-white/10 px-1 rounded">{{email}}</code>)</span>
+        </label>
+        <input id="subject" name="subject" type="text" required
+          placeholder="Hello {{name}}, here's something special for you!"
+          class="w-full bg-white/5 border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition" />
+      </div>
+
+      <!-- ── Body ── -->
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">
+          Email Body
+          <span class="block sm:inline ml-0 sm:ml-1 text-xs font-normal text-slate-500">(Rich text — use <code class="bg-white/10 px-1 rounded">{{name}}</code> / <code class="bg-white/10 px-1 rounded">{{email}}</code>)</span>
+        </label>
+        <!-- Quill editor mounts here -->
+        <div id="quillEditor"></div>
+        <!-- Hidden input carries the HTML to FastAPI -->
+        <input type="hidden" id="body" name="body" />
+      </div>
+
+      <!-- ── Attachments ── -->
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Attachments <span class="text-slate-500 font-normal">(optional)</span></label>
+        <div id="dropZone"
+          class="file-drop relative border-2 border-dashed border-white/15 rounded-xl p-4 sm:p-6 text-center cursor-pointer hover:border-brand-500/60 hover:bg-brand-500/5 transition-all group"
+          onclick="document.getElementById('fileInput').click()">
+          <svg class="mx-auto mb-1.5 sm:mb-2 w-6 h-6 sm:w-8 sm:h-8 text-slate-500 group-hover:text-brand-400 transition" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13"/>
+          </svg>
+          <p class="text-xs sm:text-sm text-slate-400 group-hover:text-slate-300 transition">
+            <span class="hidden sm:inline">Click or drag files here</span>
+            <span class="sm:hidden">Tap to attach files</span>
+          </p>
+          <input id="fileInput" name="attachments" type="file" multiple class="hidden"
+            onchange="handleFileSelect(this.files)" />
+        </div>
+        <div id="fileList" class="mt-2 sm:mt-3 flex flex-wrap gap-1.5 sm:gap-2"></div>
+      </div>
+
+      <!-- ── Send button ── -->
+      <button id="sendBtn" type="submit"
+        class="w-full flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-700 active:scale-[0.98] text-white font-semibold py-3.5 px-6 rounded-xl transition-all shadow-lg shadow-indigo-500/30 disabled:opacity-50 disabled:cursor-not-allowed">
+        <svg id="sendIcon" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"/>
+        </svg>
+        <svg id="loadingIcon" class="w-5 h-5 animate-spin-slow hidden" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+        </svg>
+        <span id="sendLabel">Send Emails</span>
+      </button>
+    </form>
+
+    <!-- ── Result panel ── -->
+    <div id="result" class="hidden mt-6 animate-fade-in"></div>
+
+    <!-- Footer -->
+    <p class="mt-6 sm:mt-8 text-center text-xs text-slate-600 px-2 leading-relaxed">
+      Powered by FastAPI &amp; Python · <code class="bg-white/5 px-1 rounded break-all">uv run uvicorn main:app --reload</code>
+    </p>
+  </div>
+
+  <!-- ─────────────────────────── Confirmation Modal ─────────────────────────── -->
+  <div id="confirmModal"
+    class="fixed inset-0 z-50 hidden items-center justify-center p-4"
+    role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+
+    <!-- Backdrop -->
+    <div id="modalBackdrop"
+      class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+      onclick="closeModal()"></div>
+
+    <!-- Panel -->
+    <div class="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-2xl shadow-2xl shadow-black/60 overflow-hidden animate-slide-up">
+
+      <!-- Header -->
+      <div class="flex items-center gap-3 px-6 py-4 border-b border-white/8 bg-amber-500/5">
+        <div class="flex-shrink-0 w-9 h-9 rounded-xl bg-amber-500/20 flex items-center justify-center">
+          <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126Z"/>
+          </svg>
+        </div>
+        <div>
+          <h2 id="modalTitle" class="text-sm font-semibold text-slate-100">Confirm before sending</h2>
+          <p class="text-xs text-slate-500">Please review all details carefully</p>
+        </div>
+        <button onclick="closeModal()" class="ml-auto text-slate-500 hover:text-slate-300 transition p-1 rounded-lg hover:bg-white/5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Summary body -->
+      <div class="px-6 py-5 space-y-3 max-h-[60vh] overflow-y-auto">
+
+        <!-- Recipients -->
+        <div class="flex gap-3">
+          <span class="w-24 flex-shrink-0 text-xs font-medium text-slate-500 pt-0.5">Recipients</span>
+          <span id="mRecipients" class="text-sm text-slate-200 font-semibold"></span>
+        </div>
+
+        <!-- CC -->
+        <div id="mCcRow" class="hidden flex gap-3">
+          <span class="w-24 flex-shrink-0 text-xs font-medium text-slate-500 pt-0.5">CC</span>
+          <span id="mCc" class="text-sm text-slate-300 break-all"></span>
+        </div>
+
+        <!-- BCC -->
+        <div id="mBccRow" class="hidden flex gap-3">
+          <span class="w-24 flex-shrink-0 text-xs font-medium text-slate-500 pt-0.5">BCC</span>
+          <span id="mBcc" class="text-sm text-slate-300 break-all"></span>
+        </div>
+
+        <div class="border-t border-white/6"></div>
+
+        <!-- Subject -->
+        <div class="flex gap-3">
+          <span class="w-24 flex-shrink-0 text-xs font-medium text-slate-500 pt-0.5">Subject</span>
+          <span id="mSubject" class="text-sm text-slate-200"></span>
+        </div>
+
+        <!-- Body preview -->
+        <div class="flex gap-3">
+          <span class="w-24 flex-shrink-0 text-xs font-medium text-slate-500 pt-0.5">Body</span>
+          <div id="mBody"
+            class="text-xs text-slate-400 bg-white/4 border border-white/8 rounded-lg px-3 py-2 max-h-28 overflow-y-auto leading-relaxed flex-1 [&_*]:text-slate-400"></div>
+        </div>
+
+        <!-- Attachments -->
+        <div id="mAttRow" class="hidden flex gap-3">
+          <span class="w-24 flex-shrink-0 text-xs font-medium text-slate-500 pt-0.5">Attachments</span>
+          <span id="mAttachments" class="text-sm text-slate-300"></span>
+        </div>
+
+      </div>
+
+      <!-- Warning note -->
+      <div class="mx-6 mb-4 flex items-start gap-2 bg-amber-500/8 border border-amber-500/20 rounded-xl px-3 py-2.5">
+        <svg class="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/>
+        </svg>
+        <p class="text-xs text-amber-300/80">Emails cannot be recalled once sent. Make sure everything looks correct.</p>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex gap-3 px-6 pb-5">
+        <button onclick="closeModal()"
+          class="flex-1 py-2.5 px-4 rounded-xl border border-white/10 text-sm font-medium text-slate-300 hover:bg-white/5 hover:text-white transition-all">
+          Cancel
+        </button>
+        <button id="confirmSendBtn" onclick="doSend()"
+          class="flex-1 py-2.5 px-4 rounded-xl bg-brand-600 hover:bg-brand-700 active:scale-[0.98] text-sm font-semibold text-white transition-all shadow-lg shadow-indigo-500/30">
+          Confirm &amp; Send
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── Quill rich-text editor init ───────────────────────────────────────
+    const quill = new Quill('#quillEditor', {
+      theme: 'snow',
+      placeholder: 'Hi {{name}},\n\nWe wanted to reach out to you personally…\n\nBest regards,\nThe Team',
+      modules: {
+        toolbar: [
+          [{ header: [1, 2, 3, false] }],
+          ['bold', 'italic', 'underline', 'strike'],
+          [{ color: [] }, { background: [] }],
+          [{ list: 'ordered' }, { list: 'bullet' }],
+          [{ align: [] }],
+          ['blockquote', 'code-block'],
+          ['link', 'image'],
+          ['clean']
+        ]
+      }
+    });
+
+    // ── File list tracking ─────────────────────────────────────────────────
+    let selectedFiles = new DataTransfer();
+
+    function handleFileSelect(files) {
+      for (const f of files) selectedFiles.items.add(f);
+      document.getElementById('fileInput').files = selectedFiles.files;
+      renderFileList();
+    }
+
+    function removeFile(name) {
+      const dt = new DataTransfer();
+      for (const f of selectedFiles.files) {
+        if (f.name !== name) dt.items.add(f);
+      }
+      selectedFiles = dt;
+      document.getElementById('fileInput').files = selectedFiles.files;
+      renderFileList();
+    }
+
+    function renderFileList() {
+      const el = document.getElementById('fileList');
+      el.innerHTML = '';
+      for (const f of selectedFiles.files) {
+        const tag = document.createElement('div');
+        tag.className = 'tag flex items-center gap-1.5 bg-white/8 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-slate-300';
+        tag.innerHTML = `
+          <svg class="w-3.5 h-3.5 text-brand-400 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32"/>
+          </svg>
+          <span class="max-w-[160px] truncate">${f.name}</span>
+          <span class="text-slate-600 ml-0.5">${(f.size/1024).toFixed(1)}KB</span>
+          <button type="button" onclick="removeFile('${f.name}')" class="ml-1 text-slate-500 hover:text-red-400 transition">✕</button>`;
+        el.appendChild(tag);
+      }
+    }
+
+    // ── Drag & drop ────────────────────────────────────────────────────────
+    const dropZone = document.getElementById('dropZone');
+    dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      handleFileSelect(e.dataTransfer.files);
+    });
+
+    // ── CC / BCC toggle ────────────────────────────────────────────────────
+    document.getElementById('ccToggle').addEventListener('click', () => {
+      const panel   = document.getElementById('ccPanel');
+      const chevron = document.getElementById('ccChevron');
+      const isOpen  = !panel.classList.contains('hidden');
+      panel.classList.toggle('hidden', isOpen);
+      chevron.style.transform = isOpen ? '' : 'rotate(-180deg)';
+    });
+
+    // ── Recipient counter ──────────────────────────────────────────────────
+    document.getElementById('recipients').addEventListener('input', function() {
+      const count = this.value.split('\n').filter(l => l.trim()).length;
+      document.getElementById('recipientCount').textContent = `${count} recipient${count !== 1 ? 's' : ''}`;
+    });
+
+    // ── Modal helpers ────────────────────────────────────────────────────────
+    let pendingFormData = null;
+
+    function openModal() {
+      const modal = document.getElementById('confirmModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal() {
+      const modal = document.getElementById('confirmModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      document.body.style.overflow = '';
+    }
+
+    // Close on Escape
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+    // ── Form submit: validate → populate modal → show ───────────────────────────
+    document.getElementById('emailForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      // Validate Quill body
+      const html = quill.root.innerHTML;
+      if (html === '<p><br></p>' || quill.getText().trim() === '') {
+        quill.root.style.outline = '2px solid #f87171';
+        quill.root.focus();
+        return;
+      }
+      quill.root.style.outline = '';
+      document.getElementById('body').value = html;
+
+      // Snapshot FormData for the actual send
+      pendingFormData = new FormData(e.target);
+
+      // ── Populate modal summary ──
+      const recipientLines = document.getElementById('recipients').value
+        .split('\n').filter(l => l.trim());
+      document.getElementById('mRecipients').textContent =
+        `${recipientLines.length} recipient${recipientLines.length !== 1 ? 's' : ''}`;
+
+      const ccVal  = (document.getElementById('cc')?.value  || '').trim();
+      const bccVal = (document.getElementById('bcc')?.value || '').trim();
+
+      const ccRow  = document.getElementById('mCcRow');
+      const bccRow = document.getElementById('mBccRow');
+      ccRow.classList.toggle('hidden', !ccVal);
+      bccRow.classList.toggle('hidden', !bccVal);
+      if (ccVal)  document.getElementById('mCc').textContent  = ccVal;
+      if (bccVal) document.getElementById('mBcc').textContent = bccVal;
+
+      document.getElementById('mSubject').textContent =
+        document.getElementById('subject').value || '(no subject)';
+
+      // Body preview — render HTML safely inside the preview div
+      document.getElementById('mBody').innerHTML = html;
+
+      const attCount = selectedFiles.files.length;
+      const attRow   = document.getElementById('mAttRow');
+      attRow.classList.toggle('hidden', attCount === 0);
+      if (attCount > 0) {
+        document.getElementById('mAttachments').textContent =
+          `${attCount} file${attCount !== 1 ? 's' : ''}: ` +
+          Array.from(selectedFiles.files).map(f => f.name).join(', ');
+      }
+
+      openModal();
+    });
+
+    // ── Actual send (called by Confirm button) ──────────────────────────────────
+    async function doSend() {
+      closeModal();
+
+      const btn         = document.getElementById('sendBtn');
+      const label       = document.getElementById('sendLabel');
+      const sendIcon    = document.getElementById('sendIcon');
+      const loadingIcon = document.getElementById('loadingIcon');
+      const result      = document.getElementById('result');
+
+      btn.disabled = true;
+      sendIcon.classList.add('hidden');
+      loadingIcon.classList.remove('hidden');
+      label.textContent = 'Sending…';
+      result.innerHTML  = '';
+      result.classList.add('hidden');
+
+      try {
+        const res  = await fetch('/send', { method: 'POST', body: pendingFormData });
+        const data = await res.json();
+        result.classList.remove('hidden');
+
+        if (res.ok) {
+          const allGood = data.failed === 0;
+          result.innerHTML = `
+            <div class="bg-white/5 backdrop-blur border ${allGood ? 'border-emerald-500/30' : 'border-amber-500/30'} rounded-2xl p-6">
+              <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center ${allGood ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}">
+                  ${allGood
+                    ? '<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>'
+                    : '<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126Z"/></svg>'
+                  }
+                </div>
+                <div>
+                  <p class="font-semibold text-slate-100">${allGood ? 'All emails sent!' : 'Partially sent'}</p>
+                  <p class="text-xs text-slate-400 mt-0.5">
+                    <span class="text-emerald-400 font-medium">${data.sent} sent</span>
+                    ${data.failed > 0 ? ` · <span class="text-red-400 font-medium">${data.failed} failed</span>` : ''}
+                    · ${data.total} total
+                  </p>
+                </div>
+              </div>
+              ${data.errors.length > 0 ? `
+              <div class="mt-3 space-y-1">
+                <p class="text-xs font-medium text-slate-400 mb-2">Failed deliveries:</p>
+                ${data.errors.map(e => `
+                  <div class="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-xs">
+                    <span class="text-red-400 font-mono">${e.email}</span>
+                    <span class="text-slate-500">—</span>
+                    <span class="text-slate-400">${e.error}</span>
+                  </div>`).join('')}
+              </div>` : ''}
+            </div>`;
+        } else {
+          result.innerHTML = `
+            <div class="bg-red-500/10 border border-red-500/30 rounded-2xl p-5 flex items-start gap-3">
+              <svg class="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"/>
+              </svg>
+              <div>
+                <p class="font-semibold text-red-400">Error</p>
+                <p class="text-sm text-slate-300 mt-0.5">${data.detail || 'Something went wrong.'}</p>
+              </div>
+            </div>`;
+        }
+      } catch (err) {
+        result.classList.remove('hidden');
+        result.innerHTML = `
+          <div class="bg-red-500/10 border border-red-500/30 rounded-2xl p-5">
+            <p class="font-semibold text-red-400">Network error</p>
+            <p class="text-sm text-slate-400 mt-1">${err.message}</p>
+          </div>`;
+      } finally {
+        btn.disabled = false;
+        sendIcon.classList.remove('hidden');
+        loadingIcon.classList.add('hidden');
+        label.textContent = 'Send Emails';
+        pendingFormData = null;
+      }
+    }
+  </script>
+</body>
+</html>

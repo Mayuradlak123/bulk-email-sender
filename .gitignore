@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# uv / virtualenv
+.venv/
+.uv/
+
+# Environment — NEVER commit real credentials
+.env
+
+# OS
+.DS_Store
+Thumbs.db
