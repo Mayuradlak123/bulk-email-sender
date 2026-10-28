@@ -132,7 +132,7 @@
         <div class="flex items-center justify-between mb-1.5">
           <label class="text-sm font-medium text-slate-300">
             Recipients
-            <span class="block sm:inline ml-0 sm:ml-1 text-xs font-normal text-slate-500">(one per line — "Name, email" or just "email")</span>
+            <span class="block sm:inline ml-0 sm:ml-1 text-xs font-normal text-slate-500">(comma, newline, or "Name, email" separated)</span>
           </label>
           <button type="button" id="ccToggle"
             class="flex items-center gap-1 text-xs text-slate-500 hover:text-brand-400 transition-colors px-2 py-1 rounded-lg hover:bg-white/5 flex-shrink-0">
@@ -143,9 +143,9 @@
           </button>
         </div>
         <textarea id="recipients" name="recipients" rows="4" required
-          placeholder="John Doe, john@example.com&#10;Jane Smith, jane@example.com&#10;bob@example.com"
+          placeholder="Paste emails separated by commas or lines, e.g.:&#10;alice@company.com, bob@org.net&#10;John Doe, john@example.com"
           class="w-full bg-white/5 border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition resize-y"></textarea>
-        <p id="recipientCount" class="mt-1 text-xs text-slate-500">0 recipients</p>
+        <div id="recipientCount" class="mt-1 text-xs text-slate-500 flex items-center gap-2">0 recipients</div>
 
         <!-- CC / BCC collapsible panel -->
         <div id="ccPanel" class="hidden mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -270,7 +270,10 @@
         <!-- Recipients -->
         <div class="flex gap-3">
           <span class="w-24 flex-shrink-0 text-xs font-medium text-slate-500 pt-0.5">Recipients</span>
-          <span id="mRecipients" class="text-sm text-slate-200 font-semibold"></span>
+          <div>
+            <span id="mRecipients" class="text-sm text-slate-200 font-semibold"></span>
+            <div id="mSkippedNotice" class="hidden text-xs text-amber-400 mt-1"></div>
+          </div>
         </div>
 
         <!-- CC -->
@@ -404,11 +407,99 @@
       chevron.style.transform = isOpen ? '' : 'rotate(-180deg)';
     });
 
-    // ── Recipient counter ──────────────────────────────────────────────────
-    document.getElementById('recipients').addEventListener('input', function() {
-      const count = this.value.split('\n').filter(l => l.trim()).length;
-      document.getElementById('recipientCount').textContent = `${count} recipient${count !== 1 ? 's' : ''}`;
-    });
+    // ── Smart Recipient Parser & Validator ────────────────────────────────
+    const EMAIL_REGEX = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
+
+    function parseRecipients(raw) {
+      if (!raw || !raw.trim()) return { valid: [], skipped: [] };
+      const lines = raw.split('\n');
+      const tokens = [];
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        if ((trimmed.match(/@/g) || []).length > 1) {
+          // Multiple emails on a single line separated by comma or semicolon
+          trimmed.split(/[,;]+/).forEach(t => {
+            if (t.trim()) tokens.push(t.trim());
+          });
+        } else {
+          tokens.push(trimmed);
+        }
+      }
+
+      const valid = [];
+      const skipped = [];
+      const seen = new Set();
+
+      for (const item of tokens) {
+        let name = '';
+        let email = '';
+
+        // Check "Name <email@domain.com>"
+        const angle = item.match(/^(.*?)\s*<([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)>$/);
+        if (angle) {
+          name = angle[1].trim().replace(/^["']|["']$/g, '');
+          email = angle[2].trim().toLowerCase();
+        } else if (item.includes(',')) {
+          const parts = item.split(',');
+          const p1 = parts[0].trim();
+          const p2 = parts[1].trim();
+          if (EMAIL_REGEX.test(p2)) {
+            name = p1.replace(/^["']|["']$/g, '');
+            email = p2.toLowerCase();
+          } else if (EMAIL_REGEX.test(p1)) {
+            name = p2.replace(/^["']|["']$/g, '');
+            email = p1.toLowerCase();
+          } else {
+            const found = item.match(/[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+/);
+            if (found) {
+              email = found[0].toLowerCase();
+              name = item.replace(found[0], '').trim().replace(/^[,;\s"']+|[,;\s"']+$/g, '');
+            }
+          }
+        } else {
+          const found = item.match(/[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+/);
+          if (found) {
+            email = found[0].toLowerCase();
+            name = item.replace(found[0], '').trim().replace(/^[,;\s"']+|[,;\s"']+$/g, '');
+          } else {
+            email = item.trim().toLowerCase();
+          }
+        }
+
+        if (!email || !EMAIL_REGEX.test(email)) {
+          skipped.push({ raw: item, reason: 'Invalid format' });
+          continue;
+        }
+
+        if (seen.has(email)) {
+          skipped.push({ raw: email, reason: 'Duplicate' });
+          continue;
+        }
+        seen.add(email);
+        if (!name) name = email.split('@')[0];
+        valid.push({ name, email });
+      }
+
+      return { valid, skipped };
+    }
+
+    function updateRecipientStats() {
+      const parsed = parseRecipients(document.getElementById('recipients').value);
+      const counterEl = document.getElementById('recipientCount');
+      if (parsed.valid.length === 0 && parsed.skipped.length === 0) {
+        counterEl.innerHTML = `<span class="text-slate-500">0 recipients</span>`;
+      } else {
+        let html = `<span class="text-emerald-400 font-medium">✓ ${parsed.valid.length} active recipient${parsed.valid.length !== 1 ? 's' : ''}</span>`;
+        if (parsed.skipped.length > 0) {
+          html += ` · <span class="text-amber-400">⚠️ ${parsed.skipped.length} skipped (${parsed.skipped.map(s => s.reason).join(', ')})</span>`;
+        }
+        counterEl.innerHTML = html;
+      }
+      return parsed;
+    }
+
+    document.getElementById('recipients').addEventListener('input', updateRecipientStats);
 
     // ── Modal helpers ────────────────────────────────────────────────────────
     let pendingFormData = null;
@@ -434,6 +525,12 @@
     document.getElementById('emailForm').addEventListener('submit', (e) => {
       e.preventDefault();
 
+      const parsed = updateRecipientStats();
+      if (parsed.valid.length === 0) {
+        alert('Please enter at least one valid recipient email address.');
+        return;
+      }
+
       // Validate Quill body
       const html = quill.root.innerHTML;
       if (html === '<p><br></p>' || quill.getText().trim() === '') {
@@ -448,10 +545,16 @@
       pendingFormData = new FormData(e.target);
 
       // ── Populate modal summary ──
-      const recipientLines = document.getElementById('recipients').value
-        .split('\n').filter(l => l.trim());
       document.getElementById('mRecipients').textContent =
-        `${recipientLines.length} recipient${recipientLines.length !== 1 ? 's' : ''}`;
+        `${parsed.valid.length} valid recipient${parsed.valid.length !== 1 ? 's' : ''}`;
+
+      const skippedNotice = document.getElementById('mSkippedNotice');
+      if (parsed.skipped.length > 0) {
+        skippedNotice.textContent = `⚠️ ${parsed.skipped.length} invalid or duplicate address${parsed.skipped.length !== 1 ? 'es' : ''} skipped`;
+        skippedNotice.classList.remove('hidden');
+      } else {
+        skippedNotice.classList.add('hidden');
+      }
 
       const ccVal  = (document.getElementById('cc')?.value  || '').trim();
       const bccVal = (document.getElementById('bcc')?.value || '').trim();
@@ -466,7 +569,7 @@
       document.getElementById('mSubject').textContent =
         document.getElementById('subject').value || '(no subject)';
 
-      // Body preview — render HTML safely inside the preview div
+      // Body preview
       document.getElementById('mBody').innerHTML = html;
 
       const attCount = selectedFiles.files.length;
@@ -504,7 +607,7 @@
         result.classList.remove('hidden');
 
         if (res.ok) {
-          const allGood = data.failed === 0;
+          const allGood = data.failed === 0 && (data.skipped || 0) === 0;
           result.innerHTML = `
             <div class="bg-white/5 backdrop-blur border ${allGood ? 'border-emerald-500/30' : 'border-amber-500/30'} rounded-2xl p-6">
               <div class="flex items-center gap-3 mb-4">
@@ -515,19 +618,32 @@
                   }
                 </div>
                 <div>
-                  <p class="font-semibold text-slate-100">${allGood ? 'All emails sent!' : 'Partially sent'}</p>
+                  <p class="font-semibold text-slate-100">${allGood ? 'All active emails sent!' : 'Partially sent / Skipped'}</p>
                   <p class="text-xs text-slate-400 mt-0.5">
                     <span class="text-emerald-400 font-medium">${data.sent} sent</span>
-                    ${data.failed > 0 ? ` · <span class="text-red-400 font-medium">${data.failed} failed</span>` : ''}
-                    · ${data.total} total
+                    ${(data.skipped || 0) > 0 ? ` · <span class="text-amber-400 font-medium">${data.skipped} skipped</span>` : ''}
+                    ${(data.failed || 0) > 0 ? ` · <span class="text-red-400 font-medium">${data.failed} failed</span>` : ''}
+                    · ${data.total} total parsed
                   </p>
                 </div>
               </div>
-              ${data.errors.length > 0 ? `
+
+              ${(data.skipped_details && data.skipped_details.length > 0) ? `
+              <div class="mt-3 space-y-1 mb-3">
+                <p class="text-xs font-medium text-amber-400">Skipped (inactive domain / bad syntax):</p>
+                ${data.skipped_details.map(s => `
+                  <div class="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-1.5 text-xs">
+                    <span class="text-amber-300 font-mono">${s.raw}</span>
+                    <span class="text-slate-500">—</span>
+                    <span class="text-slate-400">${s.reason}</span>
+                  </div>`).join('')}
+              </div>` : ''}
+
+              ${(data.errors && data.errors.length > 0) ? `
               <div class="mt-3 space-y-1">
-                <p class="text-xs font-medium text-slate-400 mb-2">Failed deliveries:</p>
+                <p class="text-xs font-medium text-red-400">Failed deliveries:</p>
                 ${data.errors.map(e => `
-                  <div class="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-xs">
+                  <div class="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-1.5 text-xs">
                     <span class="text-red-400 font-mono">${e.email}</span>
                     <span class="text-slate-500">—</span>
                     <span class="text-slate-400">${e.error}</span>
@@ -561,6 +677,7 @@
         pendingFormData = null;
       }
     }
+
   </script>
 </body>
 </html>
